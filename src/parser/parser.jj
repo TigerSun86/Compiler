@@ -1,0 +1,156 @@
+options {
+DEBUG_PARSER = true;
+}
+
+PARSER_BEGIN(MiniJavaParser)
+package parser;
+public class MiniJavaParser {}
+PARSER_END(MiniJavaParser)
+
+SKIP : {
+   < "//" (~["\n", "\r"])* ("\n" | "\r" | "\r\n")>
+   | < "/*" ("\n" | "\r" | ~[])* "*/">
+   | " "
+   | "\b"
+   | "\f"
+   | "\t"
+   | "\r"
+   | "\n"
+   | "\r\n"
+}
+
+TOKEN : {
+    < #DIGIT:         ["0"-"9"] >
+    | < #LETTER:      ["a"-"z"] | ["A"-"Z"] >
+    | < CLASS:        "class" >
+	| < PUBLIC:       "public" >
+	| < STATIC:       "static" >
+	| < VOID:         "void" >
+	| < MAIN:         "main" >
+	| < LEFTBRACE:    "{" >
+	| < RIGHTBRACE:   "}" >
+	| < LEFTPAREN:    "(" >
+	| < RIGHTPAREN:   ")" >
+	| < LEFTBRACKET:  "[" >
+	| < RIGHTBRACKET: "]" >
+	| < EXTENDS:      "extends" >
+	| < RETURN:       "return" >
+	| < STRING:       "String" >
+	| < INT:          "int" >
+	| < BOOLEAN:      "boolean" >
+	| < ASSIGN:       "=" >
+	| < AND:          "&&" >
+	| < LT:           "<" >
+	| < PLUS:         "+" >
+	| < MINUS:        "-" >
+	| < MULT:         "*" >
+	| < DOT:          "." >
+	| < COMMA:        "," >
+	| < EXCLAMATION:  "!" >
+	| < SEMICOLON:    ";" >
+	| < LENGTH:       "length" >
+	| < TRUE:         "true" >
+	| < FALSE:        "false" >
+	| < THIS:         "this" >
+	| < NEW:          "new" >
+    | < IF:           "if" >
+   	| < ELSE:         "else" >
+   	| < WHILE:        "while" >
+   	| < PRINT:        "System.out.println" >
+   	| < INTEGER_LITERAL: (<DIGIT>)+ >
+    | < IDENTIFIER:   <LETTER> (<LETTER> | <DIGIT> | "_")* >
+   	| < ERROR:   ~[" ", "\t", "\n", "\b", "\f", "\r"] >
+}
+
+void Program():{}{
+	MainClass() ( ClassDecl() )* <EOF>
+}
+      	
+void MainClass():{}{
+	<CLASS> <IDENTIFIER> <LEFTBRACE> <PUBLIC> <STATIC> <VOID> <MAIN> 
+	<LEFTPAREN> <STRING> <LEFTBRACKET> <RIGHTBRACKET> <IDENTIFIER> <RIGHTPAREN>
+	<LEFTBRACE> (Statement())* <RIGHTBRACE> <RIGHTBRACE>
+}
+
+void ClassDecl():{}{
+	<CLASS> <IDENTIFIER> (<EXTENDS> <IDENTIFIER>)? <LEFTBRACE> (VarDecl())* (MethodDecl())* <RIGHTBRACE>
+}
+
+void VarDecl():{}{
+	Type() <IDENTIFIER> <SEMICOLON>
+}
+
+void MethodDecl():{}{
+	<PUBLIC> Type() <IDENTIFIER> <LEFTPAREN> (FormalList())? <RIGHTPAREN>
+    <LEFTBRACE> MethodBody() <RETURN> Exp1()  <SEMICOLON> <RIGHTBRACE> 
+}
+
+void FormalList():{}{
+	Type() <IDENTIFIER> (FormalRest())*
+}
+ 
+void FormalRest():{}{
+    "," Type() <IDENTIFIER>
+}
+void MethodBody():{}{
+ 	(LOOKAHEAD(2) VarDecl())* (Statement())*
+}
+void Type():{}{
+    LOOKAHEAD(2) <INT> <LEFTBRACKET> <RIGHTBRACKET>
+|   <INT>
+|	<BOOLEAN>
+|	<IDENTIFIER>
+}
+
+void Statement():{}{
+	<LEFTBRACE> (Statement())* <RIGHTBRACE>
+|	<IF> <LEFTPAREN> Exp1() <RIGHTPAREN>  Statement()  <ELSE>  Statement()
+|	<WHILE> <LEFTPAREN> Exp1() <RIGHTPAREN>  Statement()
+|	<PRINT> <LEFTPAREN> Exp1() <RIGHTPAREN> <SEMICOLON>
+|	Assign()
+}
+
+void Assign():{}{
+	LOOKAHEAD(2) <IDENTIFIER> <ASSIGN> Exp1() <SEMICOLON>
+|   <IDENTIFIER> <LEFTBRACKET> Exp1() <RIGHTBRACKET> <ASSIGN> Exp1() <SEMICOLON>
+}
+
+void ExpList():{}{
+	Exp1() (ExpRest())*
+}
+void ExpRest():{}{
+	<COMMA> Exp1()
+}
+void Exp1():{}{
+    Exp2() (Exp1Rest())*
+}
+
+void Exp1Rest():{}{
+	(( <AND> | <LT> | <PLUS> | <MINUS> | <MULT> ) Exp2())
+|	(<LEFTBRACKET> Exp1() <RIGHTBRACKET>)
+}
+
+void Exp2():{}{
+	Primary() (Selector())*
+}
+
+void Primary():{}{
+	<INTEGER_LITERAL>
+|	<TRUE>
+|	<FALSE>
+|	<IDENTIFIER>
+|	<THIS>
+|   Creator()
+|	<LEFTPAREN> Exp1() <RIGHTPAREN>
+|   <EXCLAMATION> Primary()
+}
+
+void Selector():{}{
+	LOOKAHEAD(2) <DOT> <LENGTH>
+|   <DOT> <IDENTIFIER> <LEFTPAREN> (ExpList())? <RIGHTPAREN>
+}
+
+void Creator():{}{
+	LOOKAHEAD(2) <NEW> <INT> <LEFTBRACKET> Exp1() <RIGHTBRACKET>
+|	<NEW> <IDENTIFIER> <LEFTPAREN> <RIGHTPAREN>
+}

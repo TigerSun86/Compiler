@@ -1,0 +1,370 @@
+options {
+DEBUG_PARSER = true;
+}
+
+PARSER_BEGIN(MiniJavaChecker)
+package parser;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import syntax.*;
+
+public class MiniJavaChecker {}
+
+class MethodBody {
+    public final List <VarDecl> vl;
+    public final List <Statement> sl;
+    
+    public MethodBody (List <VarDecl> avl, List <Statement> asl) {
+    vl=avl; sl=asl;
+    }
+}
+
+class Selector{
+    public final Identifier i;           // Name of method invoked
+    public final List <Expression> el;
+    
+    public Selector (Identifier ai, List <Expression> ael) {
+        i = ai; el = ael;
+    }  
+}
+PARSER_END(MiniJavaChecker)
+
+SKIP : {
+   < "//" (~["\n", "\r"])* ("\n" | "\r" | "\r\n")>
+   | < "/*" ("\n" | "\r" | ~[])* "*/">
+   | " "
+   | "\b"
+   | "\f"
+   | "\t"
+   | "\r"
+   | "\n"
+   | "\r\n"
+}
+
+TOKEN : {
+    < #DIGIT:         ["0"-"9"] >
+    | < #LETTER:      ["a"-"z"] | ["A"-"Z"] >
+    | < CLASS:        "class" >
+	| < PUBLIC:       "public" >
+	| < STATIC:       "static" >
+	| < VOID:         "void" >
+	| < MAIN:         "main" >
+	| < LEFTBRACE:    "{" >
+	| < RIGHTBRACE:   "}" >
+	| < LEFTPAREN:    "(" >
+	| < RIGHTPAREN:   ")" >
+	| < LEFTBRACKET:  "[" >
+	| < RIGHTBRACKET: "]" >
+	| < EXTENDS:      "extends" >
+	| < RETURN:       "return" >
+	| < STRING:       "String" >
+	| < INT:          "int" >
+	| < BOOLEAN:      "boolean" >
+	| < ASSIGN:       "=" >
+	| < AND:          "&&" >
+	| < LT:           "<" >
+	| < PLUS:         "+" >
+	| < MINUS:        "-" >
+	| < MULT:         "*" >
+	| < DOT:          "." >
+	| < COMMA:        "," >
+	| < EXCLAMATION:  "!" >
+	| < SEMICOLON:    ";" >
+	| < LENGTH:       "length" >
+	| < TRUE:         "true" >
+	| < FALSE:        "false" >
+	| < THIS:         "this" >
+	| < NEW:          "new" >
+    | < IF:           "if" >
+   	| < ELSE:         "else" >
+   	| < WHILE:        "while" >
+   	| < PRINT:        "System.out.println" >
+   	| < INTEGER_LITERAL: (<DIGIT>)+ >
+    | < IDENTIFIER:   <LETTER> (<LETTER> | <DIGIT> | "_")* >
+   	| < ERROR:   ~[" ", "\t", "\n", "\b", "\f", "\r"] >
+}
+
+Program Program():
+{Program p; MainClass m; List<ClassDecl> cl = new ArrayList<ClassDecl>(); ClassDecl c;}
+{
+	m = MainClass()
+	(c = ClassDecl() {cl.add(c);})* <EOF>
+	{p = new Program(m, cl);return p;}
+}
+
+// statement one or multi?
+MainClass MainClass():{MainClass mc; Identifier ai1; Identifier ai2; Statement as;}{
+	<CLASS> ai1 = Identifier() <LEFTBRACE> <PUBLIC> <STATIC> <VOID> <MAIN> 
+	<LEFTPAREN> <STRING> <LEFTBRACKET> <RIGHTBRACKET> ai2 = Identifier() <RIGHTPAREN>
+	{List <Statement> asl = new ArrayList <Statement>();}
+    <LEFTBRACE> 
+    (
+        {Statement s2;}
+        s2=Statement()
+        {asl.add(s2);}
+    )*
+    <RIGHTBRACE>
+    {Block b = new Block(asl); as = b;}
+    <RIGHTBRACE>
+	{mc = new MainClass(ai1, ai2, as);return mc;}
+}
+
+ClassDecl ClassDecl():{ClassDecl cd;}{
+    (LOOKAHEAD(3) cd = SimpleClassDecl()
+    |  cd = ExtendingClassDecl())
+    { return cd;}}
+
+SimpleClassDecl SimpleClassDecl():{SimpleClassDecl sc;}{
+    { Identifier ai; List <VarDecl> avl= new ArrayList<VarDecl>(); List <MethodDecl> aml= new ArrayList<MethodDecl>();}
+    <CLASS> ai = Identifier() <LEFTBRACE>
+    ({VarDecl vd;} vd = VarDecl() {avl.add(vd);})*
+    ({MethodDecl md;} md=MethodDecl() {aml.add(md);})* <RIGHTBRACE>
+    {sc = new SimpleClassDecl(ai, avl, aml); return sc;}
+}
+
+ExtendingClassDecl ExtendingClassDecl():{ExtendingClassDecl ec;}{
+    { Identifier ai; Identifier aj; List <VarDecl> avl= new ArrayList<VarDecl>(); List <MethodDecl> aml= new ArrayList<MethodDecl>();}
+    <CLASS> ai = Identifier() <EXTENDS> aj = Identifier() <LEFTBRACE>
+    ({VarDecl vd;} vd = VarDecl() {avl.add(vd);})*
+    ({MethodDecl md;} md=MethodDecl() {aml.add(md);})* <RIGHTBRACE>
+    {ec = new ExtendingClassDecl(ai, aj, avl, aml); return ec;}
+}
+
+VarDecl VarDecl():{Type at; Identifier ai;}{
+	at = Type() ai = Identifier() <SEMICOLON>
+    {VarDecl vd = new VarDecl(at, ai); return vd;}
+}
+
+// Formal list may be problem;
+MethodDecl MethodDecl():{Type at; Identifier ai; List <Formal>afl= new ArrayList<Formal>(); List <VarDecl> avl= new ArrayList<VarDecl>(); List <Statement> asl= new ArrayList<Statement>(); Expression ae;}{
+	<PUBLIC> at = Type() ai = Identifier() <LEFTPAREN> (afl = FormalList())? <RIGHTPAREN>
+    <LEFTBRACE> 
+    {MethodBody mb;}
+    mb = MethodBody() 
+    {avl = mb.vl; asl = mb.sl;}
+    <RETURN> ae = Exp1()  <SEMICOLON> <RIGHTBRACE> 
+    {MethodDecl md = new MethodDecl (at, ai, afl, avl, asl, ae); return md;}
+}
+
+List <Formal> FormalList():{List <Formal> afl= new ArrayList<Formal>(); }{
+    {Type t; Identifier i;}
+	t = Type() i = Identifier()
+    {Formal f = new Formal(t, i); afl.add(f);}
+    (f = FormalRest() {afl.add(f);})*
+    {return afl;}
+}
+ 
+Formal FormalRest():{Type t; Identifier i;}{
+    <COMMA> t = Type() i = Identifier()
+    {Formal f = new Formal(t, i); return f;}
+}
+MethodBody MethodBody():{List <VarDecl> avl = new ArrayList<VarDecl>(); List <Statement> asl = new ArrayList<Statement>();}{
+ 	(LOOKAHEAD(2) {VarDecl vd;} vd = VarDecl() {avl.add(vd);})* 
+    ({Statement s;} s = Statement() {asl.add(s);})*
+    {MethodBody mb = new MethodBody(avl, asl); return mb;}
+}
+
+Type Type():{}{
+    LOOKAHEAD(2) <INT> <LEFTBRACKET> <RIGHTBRACKET> {return Type.THE_INT_ARRAY_TYPE;}
+|   <INT> {return Type.THE_INTEGER_TYPE;}
+|	<BOOLEAN> {return Type.THE_BOOLEAN_TYPE;}
+|	{Token t;} t = <IDENTIFIER> {return new IdentifierType(t.beginLine,t.beginColumn,t.image);}
+}
+
+Statement Statement():{Token t; Expression ae; Statement as1; Statement as2;}{
+   (
+        {List <Statement> asl = new ArrayList <Statement>();}
+        <LEFTBRACE> 
+        (
+            as1=Statement()
+            {asl.add(as1);}
+        )*
+        <RIGHTBRACE>
+        {Block b = new Block(asl); return b;}
+    )
+|	(
+        t = <IF> <LEFTPAREN> ae = Exp1() <RIGHTPAREN>  as1 = Statement()  <ELSE>  as2 = Statement()
+        {If i = new If (t.beginLine, t.beginColumn, ae, as1, as2);return i;}
+    )
+|	(
+        t = <WHILE> <LEFTPAREN> ae = Exp1() <RIGHTPAREN>  as1 = Statement()
+        {While w = new While (t.beginLine, t.beginColumn, ae, as1); return w;}
+    )
+|	(
+        t = <PRINT> <LEFTPAREN> ae = Exp1() <RIGHTPAREN> <SEMICOLON>
+        {Print p = new Print (t.beginLine, t.beginColumn, ae); return p;}
+    )
+|   (
+        as1 = Assign()
+        {return as1;}
+    )
+}
+
+Statement Assign():{}{
+   	LOOKAHEAD(2)
+   	(
+        {Identifier ai; Expression ae;}
+        ai = Identifier() <ASSIGN> ae = Exp1() <SEMICOLON>
+        {Assign a = new Assign (ai.lineNumber, ai.columnNumber, ai, ae); return a;}
+    )
+|   (
+        {Identifier ai;  Expression ae1; Expression ae2;}
+        ai = Identifier() <LEFTBRACKET> ae1 = Exp1() <RIGHTBRACKET> <ASSIGN> ae2 = Exp1() <SEMICOLON>
+        {ArrayAssign aa = new ArrayAssign (ai.lineNumber, ai.columnNumber, ai, ae1, ae2); return aa;}
+    )
+}
+
+Expression Exp1():{Expression e;}{
+  	e = AndExp()
+    {return e;}
+}
+
+Expression AndExp():{Expression e1; Expression e2; Token t;}{
+  e1 = LessThanExp()  (    t = <AND> e2 = LessThanExp()
+    {e1 = new And(t.beginLine, t.beginColumn, e1, e2);}  )*
+  {return e1;}
+}
+
+Expression LessThanExp():{Expression e1; Expression e2; Token t;}{
+  e1 = PlusMinusExp()
+  (
+    t = <LT> e2 = PlusMinusExp()
+    {e1 = new LessThan(t.beginLine, t.beginColumn, e1, e2);}
+  )*
+  {return e1;}
+}
+
+Expression PlusMinusExp():{Expression e1; Expression e2; Token t;}{
+  e1 = TimesExp()
+  (
+    (
+		t = <PLUS> e2 = TimesExp()
+		{e1 = new Plus(t.beginLine, t.beginColumn, e1, e2);}
+	)
+  	| (
+		t = <MINUS> e2 = TimesExp()
+		{e1 = new Minus(t.beginLine, t.beginColumn, e1, e2);}    )
+  )*
+  {return e1;}
+}
+
+Expression TimesExp():{Expression e1; Expression e2; Token t;}{
+  e1 = NotExp()
+  (
+    t = <MULT> e2 = NotExp()
+    {e1 = new Times(t.beginLine, t.beginColumn, e1, e2);}
+  )*
+  {return e1;}
+}
+
+Expression NotExp():{Expression e; Token t; List<Token> notList = new ArrayList<Token>();}{
+    (t = <EXCLAMATION> {notList.add(t);})* e = Exp2()
+    {
+        while(!notList.isEmpty()){ // From back to front.
+            t = notList.remove(notList.size()-1);
+            e = new Not(t.beginLine, t.beginColumn, e);
+        }
+        return e;
+    }
+}
+
+Expression Exp2():{Expression e; Selector s;}{
+	e = ArrayLookupExp() 
+    (
+        s = Selector()
+        {
+            if (s == null){ // Array.Length
+                e = new ArrayLength(e);
+            } else {
+                e = new Call(e, s.i, s.el);
+            }
+        }
+    )*
+    {return e;}
+}
+    
+Selector Selector():{}{
+    LOOKAHEAD(2)
+    (
+        <DOT> <LENGTH>
+        {return null;}
+    )
+|   ( 
+        {Identifier ai; List <Expression> ael = new ArrayList<Expression>();} // If no ExpList, ael will be empty list.
+        <DOT> ai = Identifier() <LEFTPAREN> (ael = ExpList())? <RIGHTPAREN>
+        {Selector s = new Selector(ai, ael); return s;}
+    )
+}
+
+List <Expression> ExpList():{List <Expression> ael = new ArrayList<Expression>(); Expression e;}{
+	e = Exp1() 
+    {ael.add(e);}
+    (e = ExpRest() {ael.add(e);})*
+    {return ael;}
+}
+
+Expression ExpRest():{Expression e;}{
+	<COMMA> e = Exp1() {return e;}
+}
+
+Expression ArrayLookupExp():{Expression e1; Expression e2 =null;}{
+	e1 = Primary() 
+    [<LEFTBRACKET> e2 = Exp1() <RIGHTBRACKET>]
+    {
+        if (e2 != null) return new ArrayLookup(e1, e2);
+        else return e1;
+    }
+}
+
+Expression Primary():{Token t;Expression ae;}{
+	(   
+        t = <INTEGER_LITERAL>
+        {return new IntegerLiteral(Integer.parseInt(t.image));}
+    )
+|	(   
+        t = <TRUE>
+        {return new True(t.beginLine, t.beginColumn);}
+    )
+|	(   
+        t = <FALSE>	
+        {return new False(t.beginLine, t.beginColumn);}
+    )
+|	(   
+        t = <IDENTIFIER>
+        {return new IdentifierExp(t.beginLine, t.beginColumn, t.image);}
+    )
+|	(   
+        t = <THIS>
+        {return new This(t.beginLine, t.beginColumn);}
+    )
+|   (
+        ae = Creator()
+        {return ae;}
+    )
+|	(
+        <LEFTPAREN> ae = Exp1() <RIGHTPAREN> 
+        {return ae;}
+    )
+}
+
+
+Expression Creator():{}{
+    LOOKAHEAD(2)
+    (
+        {Expression ae;}
+        <NEW> <INT> <LEFTBRACKET> ae = Exp1() <RIGHTBRACKET> 
+        {NewArray na = new NewArray(ae);return na;}
+    )
+|	( 
+        {Identifier i;}
+        <NEW> i = Identifier() <LEFTPAREN> <RIGHTPAREN>
+        {NewObject no = new NewObject(i); return no;}
+    )
+}
+
+Identifier Identifier():{Token t;} {
+    t = <IDENTIFIER>
+    {Identifier i = new Identifier(t.beginLine, t.beginColumn, t.image); return i;}
+}

@@ -1,0 +1,59 @@
+PARSER_BEGIN(MiniJavaScanner)
+package parser;
+public class MiniJavaScanner {}
+PARSER_END(MiniJavaScanner)
+
+SKIP : {
+   < "//" (~["\n", "\r"])* ("\n" | "\r" | "\r\n")>
+   | < "/*" ("\n" | "\r" | ~[])* "*/">
+   | " "
+   | "\b"
+   | "\f"
+   | "\t"
+   | "\r"
+   | "\n"
+   | "\r\n"
+}
+
+TOKEN : {
+    < #DIGIT:         ["0"-"9"] >
+    | < #LETTER:      ["a"-"z"] | ["A"-"Z"] >
+    | < CLASS:        "class" >
+	| < PUBLIC:       "public" >
+	| < STATIC:       "static" >
+	| < VOID:         "void" >
+	| < MAIN:         "main" >
+	| < LEFTBRACE:    "{" >
+	| < RIGHTBRACE:   "}" >
+	| < LEFTPAREN:    "(" >
+	| < RIGHTPAREN:   ")" >
+	| < LEFTBRACKET:  "[" >
+	| < RIGHTBRACKET: "]" >
+	| < EXTENDS:      "extends" >
+	| < RETURN:       "return" >
+	| < STRING:       "String" >
+	| < INT:          "int" >
+	| < BOOLEAN:      "boolean" >
+	| < ASSIGN:       "=" >
+	| < AND:          "&&" >
+	| < LT:           "<" >
+	| < PLUS:         "+" >
+	| < MINUS:        "-" >
+	| < MULT:         "*" >
+	| < DOT:          "." >
+	| < COMMA:        "," >
+	| < EXCLAMATION:  "!" >
+	| < SEMICOLON:    ";" >
+	| < LENGTH:       "length" >
+	| < TRUE:         "true" >
+	| < FALSE:        "false" >
+	| < THIS:         "this" >
+	| < NEW:          "new" >
+    | < IF:           "if" >
+   	| < ELSE:         "else" >
+   	| < WHILE:        "while" >
+   	| < PRINT:        "System.out.println" >
+   	| < INTEGER_LITERAL: (<DIGIT>)+ >
+    | < IDENTIFIER:   <LETTER> (<LETTER> | <DIGIT> | "_")* >
+   	| < ERROR:   ~[" ", "\t", "\n", "\b", "\f", "\r"] >
+}
