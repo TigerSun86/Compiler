@@ -46,6 +46,13 @@ import syntax.Times;
 import syntax.True;
 import syntax.VarDecl;
 import syntax.While;
+import tree.JUMP;
+import tree.LABEL;
+import tree.MOVE;
+import tree.NameOfLabel;
+import tree.SEQ;
+import tree.Stm;
+import tree.TEMP;
 
 /**
  * FileName:     Translator.java
@@ -65,7 +72,7 @@ public class Translator implements SyntaxTreeVisitor <TigerIRTree>  {
     private final ErrorMsg error;
     private final Dbg dbg;
     
-    private final ArrayList<TigerIRTree> fragments = new ArrayList<TigerIRTree>();
+    private final ArrayList<Stm> fragments = new ArrayList<Stm>();
     
     private ClassEntry curClass =null;
     private MethodEntry curMethod=null;
@@ -86,6 +93,14 @@ public class Translator implements SyntaxTreeVisitor <TigerIRTree>  {
         return true;
     }
     
+    private static SEQ fromList (final ArrayList<Stm> stmList) {
+        final int l= stmList.size();
+        SEQ s = new SEQ (stmList.get(l-2), stmList.get(l-1));
+        for (int i=l-3; i>=0; i--) {
+           s = new SEQ (stmList.get(i), s);
+        }
+        return s;
+     }
     // Subcomponents of Program:  MainClass m; List<ClassDecl> cl;
     public TigerIRTree visit (Program n) {
        if(n!=null &&n.m!=null) {
@@ -112,8 +127,19 @@ public class Translator implements SyntaxTreeVisitor <TigerIRTree>  {
        // No need to check 
        // n.i2.accept (this);  // identifier:  name of arguments
        
-       final TigerIRTree mainMethod = n.s.accept (this);   // statement:  body of main 
-       fragments.add(mainMethod);
+       // Store all statements in method.
+       final ArrayList<Stm> stmList = new ArrayList<Stm>();
+       // The begin label of the method body.
+       stmList.add(new LABEL(curClass.id +"$"+curMethod.id+"$"+"preludeEnd"));
+       stmList.add(n.s.accept(this).asStm()); // statement:  body of main
+       final Stm jumpStm = new JUMP(new NameOfLabel(curClass.id +"$"+
+                           curMethod.id+"$"+"epilogBegin"));
+       stmList.add(jumpStm);
+       
+       final Stm stm = fromList(stmList);
+       
+       fragments.add(stm);
+
        curMethod = null;
        curClass =null;
        return null;
@@ -169,7 +195,7 @@ public class Translator implements SyntaxTreeVisitor <TigerIRTree>  {
        //n.i.accept (this);   // Identifier i: no new line
        return null;
     }
-
+    private static final String RET_REG = "%%i0";
     // Subcomponents of MethodDecl:
     // Type t; Identifier i; List<Formal> fl; List<VarDecl> vl; List<Statement>t sl; Expression e;
     public TigerIRTree visit (MethodDecl n) {
@@ -180,19 +206,29 @@ public class Translator implements SyntaxTreeVisitor <TigerIRTree>  {
        final String methodName = n.i.s;
        curMethod = curClass.methods.get(methodName);
        assert curMethod !=null;
-              
-       for (Formal f: n.fl) f.accept (this);
-       for (VarDecl v: n.vl) v.accept (this);
-       for (Statement s: n.sl) s.accept(this);
+       // Store all statements in method.
+       final ArrayList<Stm> stmList = new ArrayList<Stm>();
+       // The begin label of the method body.
+       stmList.add(new LABEL(curClass.id +"$"+curMethod.id+"$"+"preludeEnd"));
+       
+       // Don't care about this any more
+       // for (Formal f: n.fl) f.accept (this);
+       // for (VarDecl v: n.vl) v.accept (this);
+       
+       for (Statement s: n.sl) stmList.add(s.accept(this).asStm());
 
        // Return statement
-       String retType = n.e.accept (this);
-       if (!isSameType(curMethod.type, retType)){
-           error.complain(n.e, "Cannot convert type "+retType+" to type "+curMethod.type+".");
-           retType = curMethod.type; // For return.
-       }
+       final TigerIRTree ret = n.e.accept (this);
+       final Stm retStm = new MOVE(new TEMP(RET_REG), ret.asExp());
+       stmList.add(retStm);
+       final Stm jumpStm = new JUMP(new NameOfLabel(curClass.id +"$"+
+                           curMethod.id+"$"+"epilogBegin"));
+       stmList.add(jumpStm);
+       final Stm stm = fromList(stmList);
+       fragments.add(stm);
+       
        curMethod =null;
-       return retType;
+       return null;
     }
 
     // Subcomponents of Formal:  Type t; Identifier i;
@@ -201,19 +237,19 @@ public class Translator implements SyntaxTreeVisitor <TigerIRTree>  {
        //n.t.accept (this);
        //n.i.accept (this);
        
-       return NULL;
+       return null;
     }
 
     public TigerIRTree visit (IntArrayType n) {
-       return INTARRAY;
+       return null;
     }
 
     public TigerIRTree visit (BooleanType n) {
-       return BOOLEAN;
+       return null;
     }
 
     public TigerIRTree visit (IntegerType n) {
-       return INT;
+       return null;
     }
 
     // String s;
